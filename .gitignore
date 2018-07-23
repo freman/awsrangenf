@@ -1,0 +1,10 @@
+ip-range.json
+debug
+debug.test
+tbuild-bin
+dist
+node_modules
+.vscode
+*.bak
+store
+tmp

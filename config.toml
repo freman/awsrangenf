@@ -1,0 +1,17 @@
+listen = ":8080"
+url = "https://ip-ranges.amazonaws.com/ip-ranges.json"
+timeout = "1m0s"
+store = "./store"
+ipv6 = false
+
+[route]
+table = 111
+gateway = "0.0.0.0"
+
+[webhook]
+enabled = true
+key = "gOIAuA0aJuGReuJ"
+
+[polling]
+enabled = false
+interval = "6h0m0s"
