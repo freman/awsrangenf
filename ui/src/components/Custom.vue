@@ -85,6 +85,7 @@ export default {
     },
     cancel() {
       this.addError = "";
+      this.sheet = false;
     },
     submit(custom, err, andthen) {
       this.axios

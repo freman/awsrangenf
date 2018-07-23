@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"time"
 
+	"github.com/freman/awsrangenf/sns"
 	gct "github.com/freman/go-commontypes"
 	"github.com/freman/work/bootstrap"
 	"github.com/gorilla/handlers"
@@ -66,13 +68,13 @@ func (a *app) indexHandler() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		index, err := template.New("index").Parse(indexstr)
+		index, err := template.New("index").Delims(`<script type=config>`, `</script>`).Parse(indexstr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		index.Delims(`<script type="config">`, `</script>`).Execute(w, struct{ Embedded string }{Embedded: `apiUrl=window.location.protocol + "//" + window.location.host + "/api/v1/"`})
+		index.Execute(w, struct{ Embedded template.HTML }{Embedded: `<script>apiUrl=window.location.protocol + "//" + window.location.host + "/api/v1/";</script>`})
 	}
 }
 
@@ -85,6 +87,39 @@ func (a *app) hookHandler() http.HandlerFunc {
 		if key, found := vars["key"]; !found || key != a.config.Webhook.Key {
 			http.NotFound(w, r)
 		}
+
+		msgTopic := r.Header.Get("X-Amz-Sns-Topic-Arn")
+		if msgTopic != "arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged" {
+			http.NotFound(w, r)
+		}
+		msgType := r.Header.Get("X-Amz-Sns-Message-Type")
+		if msgType == "SubscriptionConfirmation" {
+			var notificationPayload sns.Payload
+			defer r.Body.Close()
+			dec := json.NewDecoder(r.Body)
+			err := dec.Decode(&notificationPayload)
+			if err != nil {
+				a.log.Println("Decode subscription confirmation message failed", err)
+				return
+			}
+			verifyErr := notificationPayload.VerifyPayload()
+			if verifyErr != nil {
+				a.log.Println("Verifying subscription confirmation message failed", err)
+				http.Error(w, err.Error(), http.StatusForbidden)
+				return
+			}
+
+			if _, err := notificationPayload.Subscribe(); err != nil {
+				a.log.Println("Verifying subscription confirmation message failed", err)
+				http.Error(w, err.Error(), http.StatusForbidden)
+			}
+
+			return
+		}
+
+		// Out of curiosity... would be cool to see this message
+		b, _ := httputil.DumpRequest(r, true)
+		fmt.Println(string(b))
 
 		a.update()
 		SetRoutes(a)
